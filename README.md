@@ -2,7 +2,7 @@
 
 A proper implementation of multitouch input in Unity.
 
-![Multitouch](multitouch.png)
+<img src="multitouch.png" width="400">
 
 ## License
 

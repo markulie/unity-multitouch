@@ -1,66 +1,96 @@
-﻿using UnityEngine;
-using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections;
+using UnityEngine;
 
+[RequireComponent(typeof(Camera))]
 public class TouchInput : MonoBehaviour
 {
-    // Layer mask to filter out only the objects you want to interact with.
-    public LayerMask interactableLayer;
-    private Camera mainCamera;
+    [Header("Interaction")]
+    [SerializeField] private LayerMask interactableLayer;
 
-    void Start()
+    [Header("Effects")]
+    [SerializeField] private Color touchColor = Color.yellow;
+    [SerializeField] private float scaleAmount = 0.2f;
+    [SerializeField] private float effectDuration = 0.1f;
+
+    private Camera mainCamera;
+    private static readonly Vector3 ScaleOffset = Vector3.one * 0.2f;
+
+    private void Awake()
     {
         mainCamera = GetComponent<Camera>();
     }
 
-    void Update()
+    private void Update()
     {
-        // Check for touch input.
+        // Touch input
         if (Input.touchCount > 0)
         {
-            // Loop through all active touches.
             for (int i = 0; i < Input.touchCount; i++)
             {
-                UnityEngine.Touch touch = Input.GetTouch(i);
-                if (touch.phase == TouchPhase.Began) HandleInput(touch.position); // Check if the touch phase is "Began" (when the touch first starts).
+                Touch touch = Input.GetTouch(i);
+
+                if (touch.phase == TouchPhase.Began)
+                    HandleInput(touch.position);
             }
+
+            return;
         }
-        else // If no touch, use mouse input for debugging.
+
+        // Mouse input (Editor/Desktop)
+        if (Input.GetMouseButtonDown(0))
         {
-            if (Input.GetMouseButtonDown(0)) HandleInput(Input.mousePosition);
-            else if (Input.GetMouseButton(0)){} // You can also add logic for continuous interaction while the mouse button is held.
+            HandleInput(Input.mousePosition);
         }
     }
 
-    void HandleInput(Vector2 inputPosition)
+    private void HandleInput(Vector2 inputPosition)
     {
-        // Create a ray from the input position.
-        Ray ray = Camera.main.ScreenPointToRay(inputPosition);
+        Ray ray = mainCamera.ScreenPointToRay(inputPosition);
 
-        // Check if the ray hits any objects with the interactableLayer.
-        if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, interactableLayer))
-        {
-            // Object touched, you can perform actions here.
-            GameObject touchedObject = hit.collider.gameObject;
-            //Saved Color and Size
-            Color originalColor = touchedObject.GetComponent<Renderer>().material.color;
-            Vector3 originalSize = new Vector3(0.4f, 0.4f, 8f);
-            //Effects
-            touchedObject.GetComponent<Renderer>().material.color = Color.yellow;
-            touchedObject.GetComponent<AudioSource>().Play();
-            Debug.Log(touchedObject.transform.name);
-            touchedObject.transform.localScale += new Vector3(0.2f, 0.2f, 0.2f);
-            mainCamera.backgroundColor = Random.ColorHSV(0f, 1f, 1f, 1f, 0.5f, 1f);
-            //Call Method for reset
-            StartCoroutine(ResetEffects(touchedObject, originalColor, originalSize));
-        }
-        // Debug.Log(inputPosition);
+        if (!Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, interactableLayer))
+            return;
+
+        GameObject touchedObject = hit.collider.gameObject;
+
+        if (!hit.collider.TryGetComponent(out Renderer renderer))
+            return;
+
+        hit.collider.TryGetComponent(out AudioSource audioSource);
+
+        Color originalColor = renderer.material.color;
+        Vector3 originalScale = touchedObject.transform.localScale;
+
+        // Effects
+        renderer.material.color = touchColor;
+        touchedObject.transform.localScale += Vector3.one * scaleAmount;
+        audioSource?.Play();
+
+        mainCamera.backgroundColor = Random.ColorHSV(
+            0f, 1f,
+            1f, 1f,
+            0.5f, 1f);
+
+        Debug.Log(touchedObject.name);
+
+        StartCoroutine(ResetEffects(
+            renderer,
+            touchedObject.transform,
+            originalColor,
+            originalScale));
     }
 
-    IEnumerator ResetEffects(GameObject go, Color originalColor, Vector3 originalSize)
+    private IEnumerator ResetEffects(
+        Renderer renderer,
+        Transform objectTransform,
+        Color originalColor,
+        Vector3 originalScale)
     {
-        yield return new WaitForSeconds(0.1f);
-        go.transform.localScale = originalSize;
-        go.GetComponent<Renderer>().material.color = originalColor;
+        yield return new WaitForSeconds(effectDuration);
+
+        if (renderer != null)
+            renderer.material.color = originalColor;
+
+        if (objectTransform != null)
+            objectTransform.localScale = originalScale;
     }
 }
